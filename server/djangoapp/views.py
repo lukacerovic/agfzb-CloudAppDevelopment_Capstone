@@ -76,19 +76,61 @@ def signup(request):
 
 # ...
 
-# Update the `get_dealerships` view to render the index page with a list of dealerships
 def get_dealerships(request):
-    context = {}
     if request.method == "GET":
-        return render(request, 'djangoapp/index.html', context)
+        url = "your-cloud-function-domain/dealerships/dealer-get"
+        # Get dealers from the URL
+        dealerships = get_dealers_from_cf(url)
+        # Concat all dealer's short name
+        dealer_names = ' '.join([dealer.short_name for dealer in dealerships])
+        # Return a list of dealer short name
+        return HttpResponse(dealer_names)
 
 
-# Create a `get_dealer_details` view to render the reviews of a dealer
-# def get_dealer_details(request, dealer_id):
-# ...
+def get_dealer_details(request, dealer_id):
+    reviews = get_dealer_reviews_from_cf(dealer_id)
+
+    context = {'reviews': reviews}
+    return render(request, 'dealer_details.html', context)
+
 
 # Create a `add_review` view to submit a review
 # def add_review(request, dealer_id):
-# ...
+@login_required
+def add_review(request, dealer_id):
+    class AddReviewForm(forms.Form):
+        review = forms.CharField(widget=forms.Textarea)
+        purchase = forms.BooleanField(required=False)
+        
+    if request.method == 'POST':
+        # Create the review dictionary
+        review = {}
+        review["time"] = datetime.utcnow().isoformat()
+        review["name"] = request.user.username
+        review["dealership"] = dealer_id
+        review["review"] = request.POST.get('review_text', '')
+        review["purchase"] = request.POST.get('purchase', False)
+
+        # Create the JSON payload
+        json_payload = {"review": review}
+
+        # Call the post_request method
+        url = "your_review_post_url"
+        response = post_request(url, json_payload, dealerId=dealer_id)
+
+        # Process the response
+        if response.status_code == 200:
+            # Review was successfully added
+            return HttpResponse("Review added successfully!")
+        else:
+            # Failed to add review
+            return HttpResponse("Failed to add review!")
+
+    else:
+        # Handle GET request
+        # Render the form for adding a review
+        return render(request, 'add_review.html')
+
+
 
 
